@@ -4,7 +4,7 @@ QQ群相册自身带有打包单个相册进行下载的功能，但只能每个
 QQ群相册批量下载脚本是模拟用户每个群相册点击下载的过程，从而实现批量下载与导出QQ群相册。
 
 ## 使用说明
-1. 在线安装[脚本](#https://greasyfork.org/zh-CN/scripts/440970-qq-%E7%BE%A4%E7%9B%B8%E5%86%8C%E6%89%B9%E9%87%8F%E4%B8%8B%E8%BD%BD)
+1. 在线安装[脚本](https://greasyfork.org/zh-CN/scripts/440970-qq-%E7%BE%A4%E7%9B%B8%E5%86%8C%E6%89%B9%E9%87%8F%E4%B8%8B%E8%BD%BD)
 2. 在浏览器打开QQ群相册首页，将**QQ群号**修改成需要下载的QQ群号
    ```
    https://h5.qzone.qq.com/groupphoto/index?inqq=1&groupId=QQ群号
