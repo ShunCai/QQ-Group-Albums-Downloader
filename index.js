@@ -10,9 +10,6 @@
 // @icon         https://qzonestyle.gtimg.cn/aoi/img/logo/favicon.ico
 // @grant        none
 // @run-at       document-end
-// @require      https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js
-// @require      https://open.thunderurl.com/thunder-link.js
-// @require      https://cdn.jsdelivr.net/npm/clipboard@2.0.10/dist/clipboard.min.js
 // ==/UserScript==
 
 (function() {
@@ -33,24 +30,24 @@
         setTimeout(resolve, milliseconds);
     });
 
-    // 创建相册前插入按钮
-    let $createBtn = document.getElementById('js_create_album_btn');
-    if (!$createBtn) {
+    // 上传相片按钮
+    let $uploadBtn = document.querySelector('#js_pic_upload_btn,#js-header-upload')
+    if (!$uploadBtn) {
         return;
     }
 
     // 替换文件名称的特殊字符
-    const replaceFileName = (name) => {
+    const replaceFileName = name => {
         return name.replace(/'|#|~|&| |!|\\|\/|:|\?|"|<|>|\*|\|/g, "_");
     }
 
     // 下载文件
-    const download = async(albums) => {
+    const download = async albums => {
         for (const ablum of albums) {
 
             // 创建A标签
             const downLink = document.createElement('a');
-            downLink.download = replaceFileName(ablum.name) + '.zip';
+            downLink.download = replaceFileName(ablum.title) + '.zip';
             downLink.href = ablum.downloadUrl.replace('http:', 'https:');
             downLink.style.display = 'none';
             document.body.append(downLink);
@@ -68,12 +65,12 @@
     }
 
     // 迅雷下载
-    const invokeThunder = (albums) => {
+    const invokeThunder = albums => {
         // 迅雷下载任务
         const thunderTask = [];
         for (const album of albums) {
             thunderTask.push({
-                name: replaceFileName(album.name) + '.zip',
+                name: replaceFileName(album.title) + '.zip',
                 url: album.downloadUrl
             })
         }
@@ -86,27 +83,27 @@
             tasks: thunderTask
         }
 
-        if (!Thunder.pId) {
-            copyToClipboard('thunderx://' + JSON.stringify(thunderInfo));
-            return;
-        }
-        thunderLink.newTask(thunderInfo);
+        copyToClipboard('thunderx://' + JSON.stringify(thunderInfo));
     }
 
     // 复制文本到剪切板
-    const copyToClipboard = (text) => {
-        // 创建text area
-        let textArea = document.createElement("textarea");
-        textArea.value = text;
-        // 使text area不在viewport，同时设置不可见
-        textArea.style.position = "absolute";
-        textArea.style.opacity = 0;
-        textArea.style.left = "-999999px";
-        textArea.style.top = "-999999px";
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-        return new Promise((res, rej) => {
+    const copyToClipboard = async text => {
+        navigator.clipboard.writeText(text).catch((error) => {
+
+            console.error('异步复制失败', error);
+
+            // 创建text area
+            let textArea = document.createElement("textarea");
+            textArea.value = text;
+            // 使text area不在viewport，同时设置不可见
+            textArea.style.position = "absolute";
+            textArea.style.opacity = 0;
+            textArea.style.left = "-999999px";
+            textArea.style.top = "-999999px";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+
             // 执行复制命令并移除文本框
             document.execCommand('copy') ? res() : rej();
             textArea.remove();
@@ -114,74 +111,92 @@
     }
 
     // 复制相册下载地址
-    const copyAlbumUrls = (albums) => {
+    const copyAlbumUrls = async albums => {
         const urls = [];
         for (const album of albums) {
             urls.push(album.downloadUrl);
         }
-        copyToClipboard(urls.join('\n'));
+        await copyToClipboard(urls.join('\n'));
     }
 
     // 获取下载URL
-    var getDownloadUrl = (albumId, albumName) => new Promise((resolve, reject) => {
+    var getDownloadUrl = async album => {
+        // 请求地址参数
+        const urlParmas = new URLSearchParams();
+        urlParmas.append('g_tk', PSY.user.token());
+        urlParmas.append('qzonetoken', window.g_qzonetoken);
+        // 请求实体参数
+        const bodyParmas = new URLSearchParams();
+        bodyParmas.append('uin', PSY.user.getLoginUin());
+        bodyParmas.append('hostUin', -1);
+        bodyParmas.append('inCharset', 'utf-8');
+        bodyParmas.append('outCharset', 'utf-8');
+        bodyParmas.append('refer', 'refer');
+        bodyParmas.append('source', 'qzone');
+        bodyParmas.append('platform', 'qzone');
+        bodyParmas.append('format', 'json');
+        bodyParmas.append('appid', 422);
+        bodyParmas.append('selectMode', 1);
+        bodyParmas.append('albumid', album.id);
+        bodyParmas.append('hostid', getQueryString('groupId'));
+        bodyParmas.append('albumName', album.title);
+        const response = await fetch('https://h5.qzone.qq.com/proxy/domain/app.photo.qq.com/cgi-bin/app/cgi_arch_photo_v2?' + urlParmas.toString(), {
+            method: 'POST',
+            body: bodyParmas
+        });
+        return await response.json();
+    }
 
-        // 请求下载地址参数
-        const params = {
-            uin: PSY.user.getLoginUin(),
-            hostUin: -1,
-            inCharset: 'utf-8',
-            outCharset: 'utf-8',
-            refer: 'qzone',
-            source: 'qzone',
-            format: 'json',
-            appid: 422,
-            selectMode: 1,
-            albumid: albumId,
-            hostid: getQueryString('groupId'),
-            albumName: albumName
-        }
-
-        // 请求下载地址
-        const url = 'https://h5.qzone.qq.com/proxy/domain/app.photo.qq.com/cgi-bin/app/cgi_arch_photo_v2?g_tk=' + PSY.user.token() + '&qzonetoken=' + window.g_qzonetoken;
-        $.post(url, params, function(data, status, xhr) {
-            if (status === 'success') {
-                resolve(data);
-            } else {
-                reject(xhr);
-            }
-        }, 'json');
-    })
+    // 相册每页条目数
+    const ALBUMNS_PAGE_SIZE = 2;
 
     // 获取相册信息
-    const getAlbumList = () => {
+    const getAlbumInfo = async(page) => {
+        const parmas = new URLSearchParams();
+        parmas.append('g_tk', PSY.user.token());
+        parmas.append('qzonetoken', window.g_qzonetoken);
+        parmas.append('qunId', getQueryString('groupId'));
+        parmas.append('uin', PSY.user.getLoginUin());
+        parmas.append('start', page * ALBUMNS_PAGE_SIZE);
+        parmas.append('num', ALBUMNS_PAGE_SIZE);
+        parmas.append('format', 'json');
+        parmas.append('inCharset', 'utf-8');
+        parmas.append('outCharset', 'utf-8');
+        parmas.append('platform', 'qzone');
+        parmas.append('source', 'qzone');
+        parmas.append('cmd', 'qunGetAlbumList');
+        const response = await fetch('https://h5.qzone.qq.com/proxy/domain/u.photo.qzone.qq.com/cgi-bin/upp/qun_list_album_v2?' + parmas.toString());
+        return await response.json();
+    }
 
-        // 所有相册
-        const nodeList = document.querySelectorAll('#groupzone_album_list > li');
+    // 获取相册信息
+    const getAlbumList = async() => {
+        window.albums = [];
 
-        // 相册信息
-        const albums = [];
+        // 获取第一页相册 
+        const albumInfo = await getAlbumInfo(0);
+        window.albums.push(...albumInfo.data.album || []);
 
-        for (const node of nodeList) {
-            // 相册名称
-            const albumName = node.querySelector('div > div.ft > div.album-name > h4 > a').innerText;
-            // 相册ID
-            const albumId = node.getAttribute("data-id");
-            albums.push({
-                id: albumId,
-                name: albumName
-            });
+        // 相册个数
+        const total = albumInfo.data.total;
+        if (total > ALBUMNS_PAGE_SIZE) {
+            for (let page = 1; page * ALBUMNS_PAGE_SIZE < total; page++) {
+                const pageAlbumInfo = await getAlbumInfo(page);
+                window.albums.push(...pageAlbumInfo.data.album || []);
+                await delay(1500);
+            }
         }
-        return albums;
+
+        return window.albums;
     }
 
     // 获取相册下载链接
-    const getDownloadLinks = async(albums) => {
+    const getDownloadLinks = async albums => {
         for (const album of albums) {
 
             // 获取相册下载地址
-            await getDownloadUrl(album.id, album.name).then((data) => {
-                album.downloadUrl = data.data.downloadUrl;
-            })
+            const downloadInfo = await getDownloadUrl(album);
+            album.downloadUrl = downloadInfo.data.downloadUrl;
 
             // 延迟
             await delay(1000);
@@ -199,7 +214,7 @@
         // 获取相册列表
         if (!window.albums) {
             this.innerText = '获取下载链接...';
-            window.albums = getAlbumList();
+            window.albums = await getAlbumList();
             await getDownloadLinks(window.albums);
         }
 
@@ -214,12 +229,12 @@
             this.innerText = '批量下载';
         }, 1500);
     })
-    $createBtn.parentElement.appendChild($downloadBtn);
+    $uploadBtn.parentElement.appendChild($downloadBtn);
 
     // 迅雷下载
     const $thunderBtn = document.createElement('a');
     $thunderBtn.innerText = '迅雷下载';
-    $thunderBtn.setAttribute('title', '唤醒迅雷进行下载，需要安装迅雷，如无法正常唤醒，可先启动迅雷并打开剪切板监听，或直接复制链接到迅雷下载');
+    $thunderBtn.setAttribute('title', '需先安装迅雷，并打开迅雷，以及打开剪切板监听，或直接复制链接到迅雷下载');
     $thunderBtn.setAttribute('class', 'mod-btn-upload');
     $thunderBtn.style.cssText = "background-color: #5b63dd;border-color: #5b63dd;margin-left: 10px;";
     $thunderBtn.addEventListener("click", async function() {
@@ -227,7 +242,7 @@
         // 获取相册列表
         if (!window.albums) {
             this.innerText = '获取下载链接...';
-            window.albums = getAlbumList();
+            window.albums = await getAlbumList();
             await getDownloadLinks(window.albums);
         }
 
@@ -242,7 +257,7 @@
             this.innerText = '迅雷下载';
         }, 1500);
     })
-    $createBtn.parentElement.appendChild($thunderBtn);
+    $uploadBtn.parentElement.appendChild($thunderBtn);
 
     // 复制链接
     const $copyLinks = document.createElement('a');
@@ -255,14 +270,14 @@
         // 获取相册列表
         if (!window.albums) {
             this.innerText = '获取下载链接...';
-            window.albums = getAlbumList();
+            window.albums = await getAlbumList();
             await getDownloadLinks(window.albums);
         }
 
         this.innerText = '正在复制';
 
         // 复制到剪切板
-        copyAlbumUrls(albums);
+        await copyAlbumUrls(albums);
 
         this.innerText = '复制完成';
 
@@ -270,6 +285,6 @@
             this.innerText = '复制链接';
         }, 1500);
     })
-    $createBtn.parentElement.appendChild($copyLinks);
+    $uploadBtn.parentElement.appendChild($copyLinks);
 
 })();
