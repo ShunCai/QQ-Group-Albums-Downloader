@@ -2,12 +2,11 @@
 // @name         QQ群相册批量下载
 // @namespace    http://lvshuncai.com
 // @homepage     https://github.com/ShunCai/QQ-Group-Albums-Downloader
-// @version      1.0
+// @version      1.1
 // @description  自动点击QQ群相册的下载功能，实现所有的群相册的批量下载
 // @author       芷炫
 // @match        https://h5.qzone.qq.com/groupphoto/index?inqq=*&groupId=*
 // @match        https://h5.qzone.qq.com/groupphoto/album?inqq=*&groupId=*
-// @icon         https://qzonestyle.gtimg.cn/aoi/img/logo/favicon.ico
 // @grant        none
 // @run-at       document-end
 // ==/UserScript==
@@ -42,9 +41,9 @@
     }
 
     // 下载文件
-    const download = async albums => {
-        for (const ablum of albums) {
-
+    const download = async(downloadBtn, albums) => {
+        for (let i = 0; i < albums.length; i++) {
+            const ablum = albums[i];
             // 创建A标签
             const downLink = document.createElement('a');
             downLink.download = replaceFileName(ablum.title) + '.zip';
@@ -61,11 +60,12 @@
             // 移除A标签
             downLink.remove();
 
+            downloadBtn.innerText = '已下载' + (i + 1) + '/' + albums.length;
         }
     }
 
     // 迅雷下载
-    const invokeThunder = albums => {
+    const invokeThunder = async albums => {
         // 迅雷下载任务
         const thunderTask = [];
         for (const album of albums) {
@@ -83,31 +83,32 @@
             tasks: thunderTask
         }
 
-        copyToClipboard('thunderx://' + JSON.stringify(thunderInfo));
+        await copyToClipboard('thunderx://' + JSON.stringify(thunderInfo));
     }
 
     // 复制文本到剪切板
     const copyToClipboard = async text => {
-        navigator.clipboard.writeText(text).catch((error) => {
+        // 创建text area
+        let textArea = document.createElement("textarea");
+        textArea.value = text;
+        // 使text area不在viewport，同时设置不可见
+        textArea.style.position = "absolute";
+        textArea.style.opacity = 0;
+        textArea.style.left = "-999999px";
+        textArea.style.top = "-999999px";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
 
-            console.error('异步复制失败', error);
+        // 执行复制命令并移除文本框
+        let res = document.execCommand('copy');
+        if (res) {
 
-            // 创建text area
-            let textArea = document.createElement("textarea");
-            textArea.value = text;
-            // 使text area不在viewport，同时设置不可见
-            textArea.style.position = "absolute";
-            textArea.style.opacity = 0;
-            textArea.style.left = "-999999px";
-            textArea.style.top = "-999999px";
-            document.body.appendChild(textArea);
-            textArea.focus();
-            textArea.select();
+            // Chrome requires the timeout
+            await delay(1000);
 
-            // 执行复制命令并移除文本框
-            document.execCommand('copy') ? res() : rej();
             textArea.remove();
-        });
+        }
     }
 
     // 复制相册下载地址
@@ -148,7 +149,7 @@
     }
 
     // 相册每页条目数
-    const ALBUMNS_PAGE_SIZE = 2;
+    const ALBUMNS_PAGE_SIZE = 1000;
 
     // 获取相册信息
     const getAlbumInfo = async(page) => {
@@ -213,7 +214,7 @@
 
         // 获取相册列表
         if (!window.albums) {
-            this.innerText = '获取下载链接...';
+            this.innerText = '正在读取相册下载链接...';
             window.albums = await getAlbumList();
             await getDownloadLinks(window.albums);
         }
@@ -221,13 +222,13 @@
         this.innerText = '正在下载';
 
         // 浏览器下载
-        await download(albums);
+        await download(this, albums);
 
         this.innerText = '下载完成';
 
         setTimeout(() => {
             this.innerText = '批量下载';
-        }, 1500);
+        }, 3000);
     })
     $uploadBtn.parentElement.appendChild($downloadBtn);
 
@@ -241,21 +242,21 @@
 
         // 获取相册列表
         if (!window.albums) {
-            this.innerText = '获取下载链接...';
+            this.innerText = '正在读取相册下载链接...';
             window.albums = await getAlbumList();
             await getDownloadLinks(window.albums);
         }
 
-        this.innerText = '正在唤醒迅雷';
+        this.innerText = '正在触发迅雷';
 
         // 迅雷下载
-        invokeThunder(albums);
+        await invokeThunder(albums);
 
-        this.innerText = '已唤醒迅雷';
+        this.innerText = '已触发，若未下载，请打开迅雷后重试';
 
         setTimeout(() => {
             this.innerText = '迅雷下载';
-        }, 1500);
+        }, 3000);
     })
     $uploadBtn.parentElement.appendChild($thunderBtn);
 
@@ -269,7 +270,7 @@
 
         // 获取相册列表
         if (!window.albums) {
-            this.innerText = '获取下载链接...';
+            this.innerText = '正在读取相册下载链接...';
             window.albums = await getAlbumList();
             await getDownloadLinks(window.albums);
         }
@@ -283,7 +284,7 @@
 
         setTimeout(() => {
             this.innerText = '复制链接';
-        }, 1500);
+        }, 3000);
     })
     $uploadBtn.parentElement.appendChild($copyLinks);
 
